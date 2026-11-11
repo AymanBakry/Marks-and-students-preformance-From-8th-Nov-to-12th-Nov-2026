@@ -5,16 +5,27 @@ const URL_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=
 
 // أعمدة الدرجات (العد يبدأ من 0: A=0, B=1, C=2 ...)
 const FIELDS = [
-  { col: 2, label: "اختبار 1", max: 20, icon: "📝" },
-  { col: 3, label: "المشاركة", max: 10, icon: "🙋" },
-  { col: 4, label: "السلوك", max: 10, icon: "🤝" },
-  { col: 5, label: "المذكرة", max: 10, icon: "📓" },
-  { col: 6, label: "المهمة 1", max: 5, icon: "✏️" },
-  { col: 7, label: "المهمة 2", max: 5, icon: "📌" },
-  { col: 8, label: "كتابة الفقرة 2", max: 10, icon: "🖋️" },
+  { col: 8, label: "اختبار 1", max: 20, icon: "📝" },       // I
+  { col: 2, label: "المشاركة", max: 10, icon: "🙋" },        // C
+  { col: 3, label: "السلوك", max: 10, icon: "🤝" },          // D
+  { col: 4, label: "المذكرة", max: 10, icon: "📓" },         // E
+  { col: 5, label: "المهمة 1", max: 5, icon: "✏️" },        // F
+  { col: 6, label: "المهمة 2", max: 5, icon: "📌" },         // G
+  { col: 7, label: "كتابة الفقرة 2", max: 10, icon: "🖋️" }, // H
 ];
-const REPORT_COL = 10; // عمود التقرير التربوي (K)
+const ACAD_COL = 12; // المستوى الأكاديمي (M)
+const BEH_COL = 13;  // السلوك الصفي (N)
 const TOTAL_MAX = FIELDS.reduce((s, f) => s + f.max, 0); // 70
+
+// أنشطة اللغة الإنجليزية (بدون درجات): أي رقم أكبر من صفر = أنجز النشاط
+const ACTIVITIES = [
+  { col: 10, name: "Reading progress", icon: "📖",
+    ok: "ما شاء الله! أنجز ابنكم نشاط Reading progress، ونشجعه على مواصلة القراءة اليومية.",
+    no: "لم يُسجَّل له نشاط Reading progress بعد. نحفّزه على البدء اليوم، فخطوة صغيرة كل يوم تصنع فرقًا كبيرًا. 💪" },
+  { col: 11, name: "Speaking progress", icon: "🎤",
+    ok: "أحسن! شارك ابنكم في نشاط Speaking progress، ونشجعه على الاستمرار في التحدث بثقة.",
+    no: "لم يُسجَّل له نشاط Speaking progress بعد. نحفّزه على المشاركة والتحدث، فكل محاولة تقرّبه من الإتقان. 🎤" },
+];
 
 // مستويات الأداء (النسبة المئوية) وما يناسب كل مستوى من رسم متحرك ورسالة
 const TIERS = [
@@ -74,17 +85,22 @@ const fmt = n => (Math.round(n * 10) / 10).toString();
 
 // ===== التقرير التربوي =====
 // كل موضوع يُكتشف من نص المعلم ويظهر ببطاقة متحركة بلون يناسب معناه
-const TOPICS = [
-  { re: /مستوى أكاديمي ممتاز|مجتهد/, icon: "🏅", anim: "star", color: "#16a34a", title: "مجتهد ومتميز", text: "يبذل جهدًا مشكورًا ومستواه الأكاديمي مشرّف." },
-  { re: /يُستحسن|يستحسن|العناية بالدراسة/, icon: "📚", anim: "bob", color: "#ea580c", title: "عناية أكبر بالدراسة", text: "يحتاج إلى مزيد من الاهتمام والمراجعة المنتظمة." },
-  { re: /المذكر|الورك بوك|الواجبات/, icon: "✏️", anim: "write", color: "#d97706", title: "المذكرة والواجبات", text: "يُرجى متابعة حل تمارين المذكرة وإنجاز الواجبات." },
-  { re: /Reading|Speaking|Teams/i, icon: "🎧", anim: "pulse", color: "#2563eb", title: "أنشطة Teams", text: "متابعة أنشطة Reading وSpeaking على منصة Teams." },
-  { re: /سلوك (ممتاز|ملتزم)|حريص على الانضباط/, icon: "🌟", anim: "twinkle", color: "#16a34a", title: "سلوك مشرّف", text: "ملتزم ومنضبط ومتعاون داخل الصف." },
-  { re: /سجل تحس|تحسناً ملحوظ|تحسنا ملحوظ|تحسن ملحوظ/, icon: "📈", anim: "rise", color: "#0d9488", title: "تحسّن ملحوظ", text: "سجّل تقدمًا واضحًا في الالتزام بتعليمات الصف." },
-  { re: /تعزيز التركيز|المشتتات/, icon: "🎯", anim: "pulse", color: "#7c3aed", title: "تعزيز التركيز", text: "يحتاج إلى تقليل المشتتات وتوجيه طاقته نحو التحصيل." },
-  { re: /المزاح|احترام لقواعد|رفض النصح|الجلوس علي المقعد/, icon: "🤝", anim: "shake", color: "#CE1126", title: "قواعد الصف", text: "يُرجى الالتزام بقواعد الحصة والتعاون مع توجيهات المعلم." },
-  { re: /رفع الصوت|الصراخ/, icon: "🤫", anim: "shake", color: "#be185d", title: "الهدوء في الحصة", text: "يُرجى تجنب رفع الصوت أثناء الدرس." },
-  { re: /الحمام|الاستئذان|الالحاح للخروج/, icon: "🚪", anim: "swing", color: "#64748b", title: "البقاء في الصف", text: "يُرجى تقليل الخروج المتكرر أثناء الحصة." },
+const TOPICS_ACAD = [
+  { re: /متميز|ممتاز|مثابر|مجتهد|جاد|اجتهاد/, icon: "🏅", anim: "star", color: "#16a34a", title: "مجتهد ومتميز", text: "يبذل جهدًا مشكورًا ومستواه الدراسي مشرّف." },
+  { re: /ابدي الطالب|انتظم /, icon: "📈", anim: "rise", color: "#0d9488", title: "تحسّن في الانتظام", text: "أبدى عناية أكبر بدراسته وانتظامًا في إنجاز واجباته." },
+  { re: /عناية|اهتمام/, not: /ابدي الطالب|انتظم /, icon: "📚", anim: "bob", color: "#ea580c", title: "عناية أكبر بالدراسة", text: "يحتاج إلى مزيد من الاهتمام والمراجعة المنتظمة." },
+  { re: /المذكر|الورك بوك|الواجبات|لا يكتب/, icon: "✏️", anim: "write", color: "#d97706", title: "المذكرة والواجبات", text: "يُرجى متابعة التدوين وحل تمارين المذكرة وإنجاز الواجبات." },
+  { re: /المزاح|قواعد الحصة/, icon: "🤝", anim: "shake", color: "#CE1126", title: "قواعد الحصة", text: "يُرجى الالتزام بقواعد الحصة والابتعاد عن المزاح." },
+  { re: /مستديراً|مستديرا|لا يستجيب|لا يتجاوب|مكان جلوسه|مكانه/, icon: "👂", anim: "pulse", color: "#7c3aed", title: "الاستجابة للمعلم", text: "نأمل أن يستجيب لتوجيهات المعلم أثناء الدرس." },
+  { re: /لم يقدم\s+اختبار/, icon: "📝", anim: "bob", color: "#2563eb", title: "اختبار الفقرة", text: "لم يُسجَّل له اختبار الفقرة، يُرجى التواصل مع المعلم." },
+];
+const TOPICS_BEH = [
+  { re: /سلوكه (ممتاز|راق|منضبط)|ملتزم بقواعد|يتسم بالالتزام|ملتزم ومنضبط|يحرص على احترام/, icon: "🌟", anim: "twinkle", color: "#16a34a", title: "سلوك مشرّف", text: "ملتزم ومنضبط ومتعاون داخل الصف." },
+  { re: /تطور|تحسن/, icon: "📈", anim: "rise", color: "#0d9488", title: "تحسّن ملحوظ", text: "سجّل تقدمًا واضحًا في الالتزام بتعليمات الصف." },
+  { re: /التركيز|المشتتات|يشتت/, icon: "🎯", anim: "pulse", color: "#7c3aed", title: "تعزيز التركيز", text: "يحتاج إلى تقليل المشتتات وزيادة التركيز أثناء الدرس." },
+  { re: /الفوضي|الفوضى|اصوات عالية|أصوات عالية|رفع الصوت/, icon: "🤫", anim: "shake", color: "#be185d", title: "الهدوء في الحصة", text: "يُرجى تجنب رفع الصوت وإثارة الفوضى أثناء الدرس." },
+  { re: /دورة المياه|الحمام/, icon: "🚪", anim: "swing", color: "#64748b", title: "البقاء في الصف", text: "يُرجى تقليل الخروج المتكرر أثناء الحصة." },
+  { re: /طاقته|نشاطه/, icon: "⚡", anim: "star", color: "#d97706", title: "توجيه الطاقة", text: "نشجعه على توجيه طاقته نحو التحصيل الدراسي." },
 ];
 
 const REPORT_CSS = `
@@ -118,29 +134,63 @@ const REPORT_CSS = `
 .racts{display:flex;gap:8px;justify-content:center;margin-top:12px}
 .racts button{padding:10px 20px;font-size:.95rem;animation:none}
 .racts .gray{background:#64748b;box-shadow:none}
+.eng{margin:0 0 14px}
+.eng h4{margin:0 0 8px;font-weight:900;color:var(--navy)}
+.engrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.ec{position:relative;overflow:hidden;border-radius:18px;padding:14px;text-align:center;animation:pop .5s ease both}
+.ec.ok{background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:2px solid #4ade80}
+.ec.no{background:linear-gradient(135deg,#fff7ed,#fed7aa);border:2px solid #fb923c}
+.ec .ico{display:inline-block;font-size:2.6rem;line-height:1.2}
+.ec b{display:block;font-weight:900;font-size:1.05rem;unicode-bidi:plaintext}
+.ec .st{display:inline-block;margin:4px 0;border-radius:99px;padding:1px 12px;font-weight:800;font-size:.82rem;color:#fff}
+.ec.ok .st{background:#16a34a}.ec.no .st{background:#ea580c}
+.ec p{margin:4px 0 0;font-weight:700;font-size:.9rem}
+.ec.ok::after{content:"✨";position:absolute;top:6px;left:10px;animation:tw 1.6s ease-in-out infinite}
 @media print{body>*:not(#rmodal){display:none!important}.rmodal{position:static;background:none;padding:0;display:block!important}.rclose,.racts{display:none}.rwrap{box-shadow:none;animation:none;margin:0}*{animation:none!important}}
 `;
 
-function topicCards(text) {
-  const list = TOPICS.filter(t => t.re.test(text));
+function topicCards(text, topics) {
+  const list = topics.filter(t => t.re.test(text) && !(t.not && t.not.test(text)));
   if (!list.length) return "";
   return `<div class="tcards">${list.map((t, i) => `<div class="tc" style="--k:${t.color};animation-delay:${0.15 + i * 0.12}s"><span class="ico r-${t.anim}">${t.icon}</span><b>${t.title}</b><p>${t.text}</p></div>`).join("")}</div>`;
 }
 
+// حذف الجمل المكررة داخل نص التقرير
+function dedupe(text) {
+  const frags = String(text || "").split(".").map(clean).filter(Boolean);
+  let kept = [];
+  frags.forEach(f => {
+    if (kept.some(k => k.includes(f))) return;
+    kept = kept.filter(k => !f.includes(k));
+    kept.push(f);
+  });
+  return kept.length ? kept.join(". ") + "." : "";
+}
+
+// بطاقات أنشطة Reading / Speaking (عبارات تشجيعية بدون درجات)
+function activitiesHTML(r) {
+  const cards = ACTIVITIES.map((a, i) => {
+    const done = (num(r[a.col]) || 0) > 0;
+    return `<div class="ec ${done ? "ok" : "no"}" style="animation-delay:${i * 0.12}s">
+      <span class="ico ${done ? "r-star" : "r-bob"}">${a.icon}</span><b>${a.name}</b>
+      <span class="st">${done ? "✅ تم الإنجاز" : "⏳ بانتظار الإنجاز"}</span><p>${done ? a.ok : a.no}</p></div>`;
+  }).join("");
+  return `<div class="eng"><h4>🌍 أنشطة اللغة الإنجليزية على Teams</h4><div class="engrid">${cards}</div></div>`;
+}
+
 // يبني صفحة التقرير (null إذا لا يوجد تقرير للطالب)
 function reportHTML(r, tier, name, pct) {
-  const parts = String(r[REPORT_COL] || "").split("|").map(clean).filter(Boolean);
-  if (!parts.length) return null;
-  const sec = (icon, title, text, cls, d) => `<div class="rsec ${cls}" style="animation-delay:${d}s"><h4>${icon} ${title}</h4><p>${esc(text)}</p>${topicCards(text)}</div>`;
-  const body = parts.length === 1
-    ? sec("📝", "ملاحظات المعلمين", parts[0], "ra", 0.1)
-    : sec("📘", "الأداء الأكاديمي", parts[0], "ra", 0.1) + sec("🌟", "الأداء السلوكي والانضباط الصفي", parts.slice(1).join(" - "), "rb", 0.3);
+  const acad = dedupe(r[ACAD_COL]), beh = dedupe(r[BEH_COL]);
+  if (!acad && !beh) return null;
+  const sec = (icon, title, text, topics, cls, d) => `<div class="rsec ${cls}" style="animation-delay:${d}s"><h4>${icon} ${title}</h4><p>${esc(text)}</p>${topicCards(text, topics)}</div>`;
+  const body = (acad ? sec("📘", "الأداء الأكاديمي", acad, TOPICS_ACAD, "ra", 0.1) : "")
+             + (beh ? sec("🌟", "الأداء السلوكي والانضباط الصفي", beh, TOPICS_BEH, "rb", 0.3) : "");
   return `<div class="${tier.cls}"><div class="rwrap">
     <button class="rclose" data-close aria-label="إغلاق">✕</button>
     <div class="banner"><div class="conf"></div>
       <div class="btxt"><span class="badge">📋 التقرير التربوي</span><h2>${esc(name)}</h2><span class="seat">${tier.badge} • ${pct}%</span></div>
       <div class="scene">${SCENES[tier.scene]}</div></div>
-    <div class="rbody">${body}
+    <div class="rbody">${body}${activitiesHTML(r)}
       <div class="rfoot">${tier.msg}<small>مع تمنياتنا بدوام التوفيق والنجاح 🌹 — إدارة مدرسة البلاد القديم الابتدائية الإعدادية</small></div>
       <div class="racts"><button data-print>🖨️ طباعة / حفظ PDF</button><button class="gray" data-close>إغلاق</button></div>
     </div></div></div>`;
@@ -245,6 +295,7 @@ function show(r) {
       <div class="msgbox">${tier.msg}</div>
       <div class="chips">${chips}</div>
       <div class="tiles">${tiles}</div>
+      ${activitiesHTML(r)}
       <div class="totalbox">
         <div class="ring" style="--p:0"><div><span><span class="num">0</span><small>من ${TOTAL_MAX}</small></span></div></div>
         <div><h4>المجموع الكلي: ${pct}%</h4><p>${tier.badge}</p></div>
